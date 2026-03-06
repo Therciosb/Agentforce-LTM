@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlugin xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <canEscalate>false</canEscalate>
+    <description>Monitor and ensure consistency in the quality of services provided to customers.</description>
+    <developerName>p_16jKY0000008UHO_Service_Quality_Monitoring</developerName>
+    <genAiFunctions>
+        <functionName>EmployeeCopilot__GetSecurityMetricData</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>securityagent__IdentifyAnomalies</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>EmployeeCopilot__AnswerQuestionsWithKnowledge</functionName>
+    </genAiFunctions>
+    <genAiPluginInstructions>
+        <description>If anomalies in service quality are detected, use securityagent__IdentifyAnomalies.</description>
+        <developerName>instruction_1</developerName>
+        <language xsi:nil="true"/>
+        <masterLabel>instruction_1</masterLabel>
+        <sortOrder>0</sortOrder>
+    </genAiPluginInstructions>
+    <genAiPluginInstructions>
+        <description>If security metrics are required to evaluate service quality, use EmployeeCopilot__GetSecurityMetricData.</description>
+        <developerName>instruction_0</developerName>
+        <language xsi:nil="true"/>
+        <masterLabel>instruction_0</masterLabel>
+        <sortOrder>0</sortOrder>
+    </genAiPluginInstructions>
+    <language>en_US</language>
+    <localDeveloperName>p_16jKY0000008UHO_Service_Quality_Monitoring</localDeveloperName>
+    <masterLabel>Service Quality Monitoring</masterLabel>
+    <pluginType>Topic</pluginType>
+    <scope>Your job is to only track and monitor service quality by analyzing relevant data and identifying areas for improvement. You cannot handle customer-specific queries or complaints.</scope>
+</GenAiPlugin>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlannerBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>LTM agent with deterministic checkpoint saves during conversation.</description>
+    <localTopicLinks>
+        <genAiPluginName>finalization_16jKY0000008Uw4</genAiPluginName>
+    </localTopicLinks>
+    <localTopicLinks>
+        <genAiPluginName>general_assistance_16jKY0000008Uw4</genAiPluginName>
+    </localTopicLinks>
+    <localTopicLinks>
+        <genAiPluginName>topic_selector_16jKY0000008Uw4</genAiPluginName>
+    </localTopicLinks>
+    <localTopics>
+        <fullName>general_assistance_16jKY0000008Uw4</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Handles all user conversations and checkpoint memory updates.</description>
+        <developerName>general_assistance_16jKY0000008Uw4</developerName>
+        <genAiPluginInstructions>
+            <description>You are a highly personalized AI assistant for products and services.
+Adapt your tone and depth to the user&apos;s communication style and service tier.</description>
+            <developerName>instruction0_179KY000000Lu8h</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179KY000000Lu8h</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localActionLinks>
+            <functionName>save_user_context_179KY000000Lu8h</functionName>
+        </localActionLinks>
+        <localActions>
+            <fullName>save_user_context_179KY000000Lu8h</fullName>
+            <description>Saves Agent_Context__c using context object plus extracted memory fields.</description>
+            <developerName>save_user_context_179KY000000Lu8h</developerName>
+            <invocationTarget>Save_Agent_ContextObject</invocationTarget>
+            <invocationTargetType>flow</invocationTargetType>
+            <isConfirmationRequired>false</isConfirmationRequired>
+            <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+            <localDeveloperName>save_user_context</localDeveloperName>
+            <masterLabel>Save User Context</masterLabel>
+        </localActions>
+        <localDeveloperName>general_assistance</localDeveloperName>
+        <masterLabel>General Assistance</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <localTopics>
+        <fullName>finalization_16jKY0000008Uw4</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Persists memory one last time and ends conversation.</description>
+        <developerName>finalization_16jKY0000008Uw4</developerName>
+        <genAiPluginInstructions>
+            <description>You are a highly personalized AI assistant for products and services.
+Adapt your tone and depth to the user&apos;s communication style and service tier.</description>
+            <developerName>instruction0_179KY000000Lu8f</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179KY000000Lu8f</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localActionLinks>
+            <functionName>save_user_context_179KY000000Lu8f</functionName>
+        </localActionLinks>
+        <localActions>
+            <fullName>save_user_context_179KY000000Lu8f</fullName>
+            <description>Saves Agent_Context__c using context object plus extracted memory fields.</description>
+            <developerName>save_user_context_179KY000000Lu8f</developerName>
+            <invocationTarget>Save_Agent_ContextObject</invocationTarget>
+            <invocationTargetType>flow</invocationTargetType>
+            <isConfirmationRequired>false</isConfirmationRequired>
+            <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+            <localDeveloperName>save_user_context</localDeveloperName>
+            <masterLabel>Save User Context</masterLabel>
+        </localActions>
+        <localDeveloperName>finalization</localDeveloperName>
+        <masterLabel>Finalization</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <localTopics>
+        <fullName>topic_selector_16jKY0000008Uw4</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Loads context once, then routes to checkpoint assistance.</description>
+        <developerName>topic_selector_16jKY0000008Uw4</developerName>
+        <genAiPluginInstructions>
+            <description>You are a highly personalized AI assistant for products and services.
+Adapt your tone and depth to the user&apos;s communication style and service tier.</description>
+            <developerName>instruction0_179KY000000Lu8g</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179KY000000Lu8g</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localActionLinks>
+            <functionName>load_user_memory_checkpoint_179KY000000Lu8g</functionName>
+        </localActionLinks>
+        <localActions>
+            <fullName>load_user_memory_checkpoint_179KY000000Lu8g</fullName>
+            <description>Fetches the user&apos;s long-term context from the database.</description>
+            <developerName>load_user_memory_checkpoint_179KY000000Lu8g</developerName>
+            <invocationTarget>Get_Agent_ContextObject</invocationTarget>
+            <invocationTargetType>flow</invocationTargetType>
+            <isConfirmationRequired>false</isConfirmationRequired>
+            <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
+            <localDeveloperName>load_user_memory_checkpoint</localDeveloperName>
+            <masterLabel>Load User Memory Checkpoint</masterLabel>
+        </localActions>
+        <localDeveloperName>topic_selector</localDeveloperName>
+        <masterLabel>Entry Point</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <masterLabel>ltm-agent-checkpoint</masterLabel>
+    <plannerType>Atlas__ConcurrentMultiAgentOrchestration</plannerType>
+</GenAiPlannerBundle>

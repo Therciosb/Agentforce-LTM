@@ -1,0 +1,35 @@
+{
+  "required" : [ ],
+  "unevaluatedProperties" : false,
+  "properties" : {
+    "contact_id" : {
+      "title" : "Contact Id",
+      "description" : "The user's Contact ID",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "has_issue" : {
+      "title" : "Has Issue",
+      "description" : "True if the user is leaving with an unresolved issue or negative experience.",
+      "lightning:type" : "lightning__booleanType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "new_goal" : {
+      "title" : "New Goal",
+      "description" : "Any goal the user started but didn't finish.",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "new_summary" : {
+      "title" : "New Summary",
+      "description" : "A 2-3 sentence summary of the conversation.",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    }
+  },
+  "lightning:type" : "lightning__objectType"
+}

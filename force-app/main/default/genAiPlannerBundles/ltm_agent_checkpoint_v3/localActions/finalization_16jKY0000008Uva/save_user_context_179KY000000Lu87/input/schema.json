@@ -1,0 +1,52 @@
+{
+  "required" : [ ],
+  "unevaluatedProperties" : false,
+  "properties" : {
+    "contact_id" : {
+      "title" : "Contact Id",
+      "description" : "The user's Contact ID.",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "context_record" : {
+      "title" : "Context Record",
+      "description" : "Full Agent_Context__c record payload to persist.",
+      "lightning:type" : "lightning__recordInfoType",
+      "lightning:sObjectInfo" : {
+        "apiName" : "Agent_Context__c"
+      },
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "has_issue" : {
+      "title" : "Has Issue",
+      "description" : "True if the user still has an unresolved issue.",
+      "lightning:type" : "lightning__booleanType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "new_goal" : {
+      "title" : "New Goal",
+      "description" : "Unfinished goal from this conversation, or empty string.",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "new_style" : {
+      "title" : "New Style",
+      "description" : "Preferred communication style inferred from this conversation.",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "new_summary" : {
+      "title" : "New Summary",
+      "description" : "Concise summary of this conversation.",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    }
+  },
+  "lightning:type" : "lightning__objectType"
+}

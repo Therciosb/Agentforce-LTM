@@ -1,0 +1,18 @@
+agentType: customer
+companyName: sf-internal
+companyDescription: Salesforce FDE Team
+role: Engage with users responding questions regarding products and services
+maxNumOfTopics: 5
+enrichLogs: false
+tone: casual
+topics:
+  - name: Product Information Retrieval
+    description: Assist users in finding detailed product information.
+  - name: Service Plan Guidance
+    description: Provide recommendations on suitable service plans.
+  - name: Order Status Updates
+    description: Deliver real-time updates on order statuses.
+  - name: Issue Resolution Assistance
+    description: Offer solutions to common product or service issues.
+  - name: Feature Demonstrations
+    description: Explain and showcase product features to users.

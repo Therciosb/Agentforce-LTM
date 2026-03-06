@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Last_Topic_Summary__c</fullName>
+    <description>LLM-generated summary of the user's last interaction.</description>
+    <externalId>false</externalId>
+    <label>Last Topic Summary</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>5</visibleLines>
+</CustomField>

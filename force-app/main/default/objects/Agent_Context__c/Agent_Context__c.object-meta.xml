@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Stores the AI agent's long-term memory per Contact for persistent context across sessions.</description>
+    <label>Agent Context</label>
+    <pluralLabel>Agent Contexts</pluralLabel>
+    <nameField>
+        <label>Agent Context Name</label>
+        <type>Text</type>
+    </nameField>
+    <sharingModel>ReadWrite</sharingModel>
+</CustomObject>

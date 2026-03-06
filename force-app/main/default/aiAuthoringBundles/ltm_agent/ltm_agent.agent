@@ -1,0 +1,179 @@
+# -----------------------------------------------------------------------------
+# LTM Agent (Educational Version)
+# -----------------------------------------------------------------------------
+# Purpose
+# - Demonstrates how to implement long-term memory in Agentforce using:
+#   1) Mutable variables for in-session state
+#   2) Flow actions for persistent read/write
+#   3) Deterministic startup logic before conversational reasoning
+#
+# High-level flow
+# 1) start_agent.topic_selector runs first
+# 2) It loads user memory from flow://Get_Agent_ContextObject (once per session)
+# 3) It stores the record in agent_context (single object variable)
+# 4) general_assistance personalizes responses from agent_context.data fields
+# 5) finalization saves context to flow://Save_Agent_ContextObject
+# -----------------------------------------------------------------------------
+
+system:
+    # Global behavior instructions for the model.
+    # Keep these generic and stable; avoid dynamic template expressions here.
+    instructions: |
+        You are a highly personalized AI assistant for products and services.
+        Adapt your tone and depth to the user's communication style and service tier.
+    messages:
+        # Initial message shown when the session starts.
+        welcome: "Accessing your profile..."
+        # Fallback message shown when an unexpected internal error occurs.
+        error: "Sorry, it looks like something has gone wrong."
+
+config:
+    # Unique API developer name for this agent.
+    developer_name: "ltm_agent"
+    # Runtime user that executes actions/flows for this agent.
+    # Replace YOUR_ORG_ID with your org ID (Setup > Company Information, or: sf org display --json | jq -r '.result.orgId')
+    default_agent_user: "ltm_agent@YOUR_ORG_ID.ext"
+    # Human-readable label shown in setup UIs.
+    agent_label: "ltm-agent"
+    # Short functional description.
+    description: "Engage with users responding questions regarding products and services"
+
+variables:
+    # Linked variables are populated by platform context.
+    EndUserId: linked string
+        source: @MessagingSession.MessagingEndUserId
+        description: "Messaging end user id from the session."
+    RoutableId: linked string
+        source: @MessagingSession.Id
+        description: "Messaging session id."
+
+    # ContactId is mutable by design in this educational project so it can be
+    # hardcoded for testing and later replaced by linked context in production.
+    # Replace with a Contact ID from your org (create test Contacts first).
+    ContactId: mutable string = "YOUR_CONTACT_ID"
+        description: "Resolved contact id used by flow actions."
+
+    # Guard flag to prevent repeated memory fetch calls in a single session.
+    context_loaded: mutable boolean = False
+        description: "Prevents duplicate context fetch in the same session."
+
+    # Full long-term memory record loaded from Get_Agent_ContextObject flow.
+    # Note: record fields are available at @variables.agent_context.data.<FieldApi>.
+    agent_context: mutable object
+        description: "Agent_Context__c record payload for profile personalization."
+
+language:
+    # Primary language for model responses.
+    default_locale: "en_US"
+    # Keep additional locales disabled for deterministic educational behavior.
+    additional_locales: ""
+    all_additional_locales: False
+
+topic general_assistance:
+    label: "General Assistance"
+    # Main conversational topic after memory initialization.
+    description: "Handles all user conversations using stored context."
+
+    reasoning:
+        instructions: ->
+            # Prompt lines below are model-visible instructions.
+            # They read directly from the loaded Agent_Context__c record.
+            | Personalize the response with this profile context: communication style = {!@variables.agent_context.data.Communication_Style__c}, tier = {!@variables.agent_context.data.User_Tier__c}, last summary = {!@variables.agent_context.data.Last_Topic_Summary__c}, unresolved issue = {!@variables.agent_context.data.Unresolved_Issue__c}, pending goal = {!@variables.agent_context.data.Pending_Goal__c}.
+            | If unresolved issue is true, acknowledge it and ask whether it was resolved. If there is a pending goal, ask if the user wants to continue it.
+            | Assist with products, services, orders, issue resolution, and related questions.
+            | If the user explicitly asks to transfer to a live agent, use escalate_to_human.
+            | If the user indicates they are done or says goodbye, use go_to_finalization.
+        actions:
+            # Utility action exposed to the model for explicit human handoff.
+            escalate_to_human: @utils.escalate
+                description: "Transfer to a live human agent on explicit request."
+            # Utility action that transitions to the save-and-goodbye topic.
+            go_to_finalization: @utils.transition to @topic.finalization
+                description: "Use when user is done and wants to end the conversation."
+
+topic finalization:
+    label: "Finalization"
+    # Dedicated topic to persist context before ending the chat.
+    description: "Summarizes and saves conversation context."
+
+    actions:
+        # Flow action for writing long-term memory.
+        save_user_context:
+            description: "Saves Agent_Context__c using context object plus extracted memory fields."
+            inputs:
+                contact_id: string
+                    description: "The user's Contact ID."
+                context_record: object
+                    description: "Full Agent_Context__c record payload to persist."
+                    complex_data_type_name: "lightning__recordInfoType"
+                new_summary: string
+                    description: "Concise summary of this conversation."
+                new_goal: string
+                    description: "Unfinished goal from this conversation, or empty string."
+                has_issue: boolean
+                    description: "True if the user still has an unresolved issue."
+                new_style: string
+                    description: "Preferred communication style inferred from this conversation."
+            outputs:
+                success: boolean
+                    description: "Whether save succeeded."
+            target: "flow://Save_Agent_ContextObject"
+
+    reasoning:
+        instructions: ->
+            # Finalization must persist memory through the save tool before goodbye.
+            | Before saying goodbye, call {!@actions.save_context_tool} exactly once to persist memory.
+            | Generate these values from this conversation and pass all of them when calling save_context_tool: new_summary, new_goal, has_issue, and new_style.
+            | Required extraction rules:
+            | - new_summary: concise 3-5 sentence summary of what happened in this session.
+            | - new_goal: unfinished user goal to continue later, or empty string if none.
+            | - has_issue: true only if the user still has unresolved issues at the end of the session.
+            | - new_style: communication preference inferred from this session (for example, concise, detailed, formal).
+            | Never call save_context_tool with empty arguments. Always include values for all required extracted fields.
+            | save_context_tool maps these extracted values into the persisted context object.
+            | After the tool returns, give a warm goodbye and confirm context is saved.
+        actions:
+            # Persist context using deterministic base object + LLM-extracted fields.
+            save_context_tool: @actions.save_user_context
+                description: "Required at session end. Save context object with extracted summary, goal, unresolved-issue flag, and communication style."
+                with contact_id=@variables.ContactId
+                with context_record=@variables.agent_context
+                with new_summary=...
+                with new_goal=...
+                with has_issue=...
+                with new_style=...
+
+# NOTE: Keep start_agent as the LAST topic block in this file.
+start_agent topic_selector:
+    label: "Entry Point"
+    # Deterministic memory bootstrap and routing topic.
+    description: "Fetches user context and routes to main assistance."
+
+    actions:
+        # Read flow action (persistent memory lookup).
+        load_user_memory:
+            description: "Fetches the user's long-term context from the database."
+            inputs:
+                contact_id: string
+                    description: "The user's Contact ID."
+            outputs:
+                context_record: object
+                    description: "Agent_Context__c record returned by flow."
+                    complex_data_type_name: "lightning__recordInfoType"
+            target: "flow://Get_Agent_ContextObject"
+
+    reasoning:
+        instructions: ->
+            # Keep variable mapping inside the run block for deterministic state.
+            if @variables.context_loaded == False and @variables.ContactId and @variables.ContactId != "":
+                run @actions.load_user_memory
+                    with contact_id=@variables.ContactId
+                    set @variables.agent_context=@outputs.context_record
+                    set @variables.context_loaded=True
+
+            # Fallback simply flips the guard to avoid repeated attempts.
+            if @variables.context_loaded == False:
+                set @variables.context_loaded=True
+
+            # Deterministic handoff to the main conversation topic.
+            transition to @topic.general_assistance

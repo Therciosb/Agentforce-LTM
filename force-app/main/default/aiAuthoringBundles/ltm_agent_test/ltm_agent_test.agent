@@ -1,0 +1,72 @@
+# -----------------------------------------------------------------------------
+# LTM Agent Test (Minimal Object Mapping)
+# -----------------------------------------------------------------------------
+
+system:
+    instructions: |
+        You are a concise assistant for product and service questions.
+    messages:
+        welcome: "Loading your context..."
+        error: "Sorry, something went wrong."
+
+config:
+    developer_name: "ltm_agent_test"
+    # Replace YOUR_ORG_ID with your org ID (Setup > Company Information)
+    default_agent_user: "ltm_agent@YOUR_ORG_ID.ext"
+    agent_label: "ltm-agent-test"
+    description: "Minimal test agent for object-based memory mapping."
+
+variables:
+    ContactId: mutable string = "YOUR_CONTACT_ID"
+        description: "Resolved contact id used by flow actions."
+
+    context_loaded: mutable boolean = False
+        description: "Prevents duplicate context fetch in the same session."
+
+    agent_context: mutable object
+        description: "Full Agent_Context__c record loaded from flow output."
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+topic general_assistance:
+    label: "General Assistance"
+    description: "Simple topic to validate object access using Agent_Context__c fields."
+
+    reasoning:
+        instructions: ->
+            | Use the loaded context object for personalization when available.
+            | Profile fields from Agent_Context__c: style = {!@variables.agent_context.data.Communication_Style__c}, tier = {!@variables.agent_context.data.User_Tier__c}, summary = {!@variables.agent_context.data.Last_Topic_Summary__c}, pending goal = {!@variables.agent_context.data.Pending_Goal__c}, unresolved issue = {!@variables.agent_context.data.Unresolved_Issue__c}.
+            | If unresolved issue is true, acknowledge it and ask whether it was resolved. If there is a pending goal, ask if the user wants to continue it.
+            | Answer the user's question clearly and briefly.
+
+start_agent topic_selector:
+    label: "Entry Point"
+    description: "Loads context object and routes to assistance."
+
+    actions:
+        load_user_memory:
+            description: "Fetches Agent_Context__c as a single object."
+            inputs:
+                contact_id: string
+                    description: "The user's Contact ID."
+            outputs:
+                context_record: object
+                    description: "Agent_Context__c record returned by flow."
+                    complex_data_type_name: "lightning__recordInfoType"
+            target: "flow://Get_Agent_ContextObject"
+
+    reasoning:
+        instructions: ->
+            if @variables.context_loaded == False and @variables.ContactId and @variables.ContactId != "":
+                run @actions.load_user_memory
+                    with contact_id=@variables.ContactId
+                    set @variables.agent_context=@outputs.context_record
+                    set @variables.context_loaded=True
+
+            if @variables.context_loaded == False:
+                set @variables.context_loaded=True
+
+            transition to @topic.general_assistance
