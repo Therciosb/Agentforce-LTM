@@ -7,8 +7,7 @@
         <name>ltm_agent_checkpoint</name>
     </botMlDomain>
     <botSource>None</botSource>
-    <!-- Replace YOUR_ORG_ID with your org ID before deploy -->
-    <botUser>ltm_agent@YOUR_ORG_ID.ext</botUser>
+    <botUser>ltm_agent@00dky00000gxhj51777765750.ext</botUser>
     <contextVariables>
         <contextVariableMappings>
             <SObjectType>MessagingSession</SObjectType>

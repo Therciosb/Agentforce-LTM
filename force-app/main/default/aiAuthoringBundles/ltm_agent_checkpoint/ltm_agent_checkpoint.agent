@@ -43,8 +43,9 @@ variables:
     context_dirty: mutable boolean = False
         description: "True when memory values changed and must be checkpoint-saved."
 
-    agent_context: mutable object
-        description: "Full Agent_Context__c record payload."
+    # Formatted string from Get_Agent_ContextObject (LoadAgentMemory Apex).
+    agent_memory: mutable string = ""
+        description: "Formatted merge of memory fields for personalization."
 
     # Working memory values used for deterministic save checkpoints.
     memory_summary: mutable string = ""
@@ -67,16 +68,12 @@ topic general_assistance:
     description: "Handles all user conversations and checkpoint memory updates."
 
     # Action contracts available inside this topic.
-    # save_user_context writes memory using the object + scalar hybrid flow pattern.
     actions:
         save_user_context:
-            description: "Saves Agent_Context__c using context object plus extracted memory fields."
+            description: "Saves Agent_Context__c using extracted memory fields."
             inputs:
                 contact_id: string
                     description: "The user's Contact ID."
-                context_record: object
-                    description: "Full Agent_Context__c record payload to persist."
-                    complex_data_type_name: "lightning__recordInfoType"
                 new_summary: string
                     description: "Add 1-3 sentences about user responses and assistant recommendations."
                 new_goal: string
@@ -91,18 +88,14 @@ topic general_assistance:
             target: "flow://Save_Agent_ContextObject"
 
     # Main conversational instructions:
-    # - personalize from loaded memory
+    # - personalize from loaded memory (agent_memory)
     # - capture a cumulative conversation summary every turn
     # - route to escalation/finalization when explicitly requested
     reasoning:
         instructions: ->
-            | Personalize the response with this profile context: 
-            | - user name = {!@variables.agent_context.data.Name},
-            | - communication style = {!@variables.agent_context.data.Communication_Style__c}, 
-            | - tier = {!@variables.agent_context.data.User_Tier__c}, 
-            | - last summary = {!@variables.memory_summary}, 
-            | - unresolved issue = {!@variables.memory_has_issue}, 
-            | - pending goal = {!@variables.memory_goal}.
+            | Here is your past context. Use it for personalization:
+            | {!@variables.agent_memory}
+            | Also use working memory: last summary = {!@variables.memory_summary}, unresolved issue = {!@variables.memory_has_issue}, pending goal = {!@variables.memory_goal}.
             | Address the user by name when greeting or acknowledging. If the name is formatted like "<person name> - Agent Context", use only the person name portion.
             | If unresolved issue is true, acknowledge it and ask whether it was resolved. If there is a pending goal, ask if the user wants to continue it.
             | In EVERY turn, call {!@actions.capture_memory_update} exactly once.
@@ -116,9 +109,6 @@ topic general_assistance:
             | If the user indicates they are done or says goodbye, use {!@actions.go_to_finalization}.
 
         # LLM-callable tools:
-        # - capture_memory_update updates working memory and marks context as dirty
-        # - escalate_to_human transfers to a live agent
-        # - go_to_finalization transitions to closing topic
         actions:
             capture_memory_update: @utils.setVariables
                 description: "Capture cumulative conversation summary plus current memory status and mark context dirty."
@@ -132,19 +122,12 @@ topic general_assistance:
                 description: "Use when user is done or there is an indication of ending the conversation."
 
     # Deterministic checkpoint logic that runs every turn:
-    # 1) Fill any missing working-memory fields from previously loaded context.
+    # 1) Fill any missing working-memory fields from loaded values (already set at startup).
     # 2) Persist only when memory was marked dirty during reasoning.
     after_reasoning:
-        if @variables.memory_summary == "":
-            set @variables.memory_summary=@variables.agent_context.data.Last_Topic_Summary__c
-        if @variables.memory_goal == "":
-            set @variables.memory_goal=@variables.agent_context.data.Pending_Goal__c
-        if @variables.memory_style == "":
-            set @variables.memory_style=@variables.agent_context.data.Communication_Style__c
         if @variables.context_dirty == True:
             run @actions.save_user_context
                 with contact_id=@variables.ContactId
-                with context_record=@variables.agent_context
                 with new_summary=@variables.memory_summary
                 with new_goal=@variables.memory_goal
                 with has_issue=@variables.memory_has_issue
@@ -155,16 +138,12 @@ topic finalization:
     label: "Finalization"
     description: "Persists memory one last time and ends conversation."
 
-    # Finalization uses the same save action contract as general assistance.
     actions:
         save_user_context:
-            description: "Saves Agent_Context__c using context object plus extracted memory fields."
+            description: "Saves Agent_Context__c using extracted memory fields."
             inputs:
                 contact_id: string
                     description: "The user's Contact ID."
-                context_record: object
-                    description: "Full Agent_Context__c record payload to persist."
-                    complex_data_type_name: "lightning__recordInfoType"
                 new_summary: string
                     description: "Detailed 3-5 sentences summary considering previous facts."
                 new_goal: string
@@ -179,21 +158,10 @@ topic finalization:
             target: "flow://Save_Agent_ContextObject"
 
     # Deterministic final save path:
-    # - apply fallback values for missing fields
-    # - persist the cumulative conversation summary built across turns
-    # - force one last save before goodbye
     reasoning:
         instructions: ->
-            if @variables.memory_summary == "":
-                set @variables.memory_summary=@variables.agent_context.data.Last_Topic_Summary__c
-            if @variables.memory_goal == "":
-                set @variables.memory_goal=@variables.agent_context.data.Pending_Goal__c
-            if @variables.memory_style == "":
-                set @variables.memory_style=@variables.agent_context.data.Communication_Style__c
-
             run @actions.save_user_context
                 with contact_id=@variables.ContactId
-                with context_record=@variables.agent_context
                 with new_summary=@variables.memory_summary
                 with new_goal=@variables.memory_goal
                 with has_issue=@variables.memory_has_issue
@@ -207,7 +175,6 @@ start_agent topic_selector:
     label: "Entry Point"
     description: "Loads context once, then routes to checkpoint assistance."
 
-    # Bootstrap action to read the full Agent_Context__c record.
     actions:
         load_user_memory_checkpoint:
             description: "Fetches the user's long-term context from the database."
@@ -215,14 +182,21 @@ start_agent topic_selector:
                 contact_id: string
                     description: "The user's Contact ID."
             outputs:
-                context_record: object
-                    description: "Agent_Context__c record returned by flow."
-                    complex_data_type_name: "lightning__recordInfoType"
+                agent_memory: string
+                    description: "Formatted merge of memory fields for personalization."
+                memory_summary: string
+                    description: "Last topic summary from loaded context."
+                memory_goal: string
+                    description: "Pending goal from loaded context."
+                memory_has_issue: boolean
+                    description: "Unresolved issue flag from loaded context."
+                memory_style: string
+                    description: "Communication style from loaded context."
             target: "flow://Get_Agent_ContextObject"
 
     # Startup sequence:
     # - load context once when ContactId exists
-    # - initialize working memory from loaded object fields
+    # - initialize working memory from flow outputs
     # - mark loaded to avoid duplicate fetches
     # - hand off to general assistance
     reasoning:
@@ -230,11 +204,11 @@ start_agent topic_selector:
             if @variables.context_loaded == False and @variables.ContactId and @variables.ContactId != "":
                 run @actions.load_user_memory_checkpoint
                     with contact_id=@variables.ContactId
-                    set @variables.agent_context=@outputs.context_record
-                    set @variables.memory_summary=@outputs.context_record.data.Last_Topic_Summary__c
-                    set @variables.memory_goal=@outputs.context_record.data.Pending_Goal__c
-                    set @variables.memory_has_issue=@outputs.context_record.data.Unresolved_Issue__c
-                    set @variables.memory_style=@outputs.context_record.data.Communication_Style__c
+                    set @variables.agent_memory=@outputs.agent_memory
+                    set @variables.memory_summary=@outputs.memory_summary
+                    set @variables.memory_goal=@outputs.memory_goal
+                    set @variables.memory_has_issue=@outputs.memory_has_issue
+                    set @variables.memory_style=@outputs.memory_style
                     set @variables.context_loaded=True
 
             if @variables.context_loaded == False:

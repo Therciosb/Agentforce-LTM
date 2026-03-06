@@ -4,14 +4,14 @@
 # Purpose
 # - Demonstrates how to implement long-term memory in Agentforce using:
 #   1) Mutable variables for in-session state
-#   2) Flow actions for persistent read/write
+#   2) Apex-backed Flow actions for persistent read/write
 #   3) Deterministic startup logic before conversational reasoning
 #
 # High-level flow
 # 1) start_agent.topic_selector runs first
 # 2) It loads user memory from flow://Get_Agent_ContextObject (once per session)
-# 3) It stores the record in agent_context (single object variable)
-# 4) general_assistance personalizes responses from agent_context.data fields
+# 3) It stores the formatted string in agent_memory
+# 4) general_assistance personalizes responses from agent_memory
 # 5) finalization saves context to flow://Save_Agent_ContextObject
 # -----------------------------------------------------------------------------
 
@@ -57,10 +57,9 @@ variables:
     context_loaded: mutable boolean = False
         description: "Prevents duplicate context fetch in the same session."
 
-    # Full long-term memory record loaded from Get_Agent_ContextObject flow.
-    # Note: record fields are available at @variables.agent_context.data.<FieldApi>.
-    agent_context: mutable object
-        description: "Agent_Context__c record payload for profile personalization."
+    # Formatted string from Get_Agent_ContextObject (LoadAgentMemory Apex).
+    agent_memory: mutable string = ""
+        description: "Formatted merge of Agent_Context__c fields for profile personalization."
 
 language:
     # Primary language for model responses.
@@ -76,10 +75,9 @@ topic general_assistance:
 
     reasoning:
         instructions: ->
-            # Prompt lines below are model-visible instructions.
-            # They read directly from the loaded Agent_Context__c record.
-            | Personalize the response with this profile context: communication style = {!@variables.agent_context.data.Communication_Style__c}, tier = {!@variables.agent_context.data.User_Tier__c}, last summary = {!@variables.agent_context.data.Last_Topic_Summary__c}, unresolved issue = {!@variables.agent_context.data.Unresolved_Issue__c}, pending goal = {!@variables.agent_context.data.Pending_Goal__c}.
-            | If unresolved issue is true, acknowledge it and ask whether it was resolved. If there is a pending goal, ask if the user wants to continue it.
+            | Here is your past context. Use it for personalization:
+            | {!@variables.agent_memory}
+            | If unresolved issue is indicated in the context, acknowledge prior issues and ask whether they were resolved. If a pending goal is set, ask if the user wants to continue it. Adapt tone to communication style and tier.
             | Assist with products, services, orders, issue resolution, and related questions.
             | If the user explicitly asks to transfer to a live agent, use escalate_to_human.
             | If the user indicates they are done or says goodbye, use go_to_finalization.
@@ -97,15 +95,12 @@ topic finalization:
     description: "Summarizes and saves conversation context."
 
     actions:
-        # Flow action for writing long-term memory.
+        # Flow action for writing long-term memory (Apex-backed).
         save_user_context:
-            description: "Saves Agent_Context__c using context object plus extracted memory fields."
+            description: "Saves Agent_Context__c using extracted memory fields."
             inputs:
                 contact_id: string
                     description: "The user's Contact ID."
-                context_record: object
-                    description: "Full Agent_Context__c record payload to persist."
-                    complex_data_type_name: "lightning__recordInfoType"
                 new_summary: string
                     description: "Concise summary of this conversation."
                 new_goal: string
@@ -130,14 +125,12 @@ topic finalization:
             | - has_issue: true only if the user still has unresolved issues at the end of the session.
             | - new_style: communication preference inferred from this session (for example, concise, detailed, formal).
             | Never call save_context_tool with empty arguments. Always include values for all required extracted fields.
-            | save_context_tool maps these extracted values into the persisted context object.
             | After the tool returns, give a warm goodbye and confirm context is saved.
         actions:
-            # Persist context using deterministic base object + LLM-extracted fields.
+            # Persist context using LLM-extracted fields.
             save_context_tool: @actions.save_user_context
-                description: "Required at session end. Save context object with extracted summary, goal, unresolved-issue flag, and communication style."
+                description: "Required at session end. Save context with extracted summary, goal, unresolved-issue flag, and communication style."
                 with contact_id=@variables.ContactId
-                with context_record=@variables.agent_context
                 with new_summary=...
                 with new_goal=...
                 with has_issue=...
@@ -150,16 +143,17 @@ start_agent topic_selector:
     description: "Fetches user context and routes to main assistance."
 
     actions:
-        # Read flow action (persistent memory lookup).
+        # Read flow action (persistent memory lookup via LoadAgentMemory Apex).
         load_user_memory:
             description: "Fetches the user's long-term context from the database."
             inputs:
                 contact_id: string
                     description: "The user's Contact ID."
+                variable_name: string
+                    description: "Target variable name (default: agent_memory)."
             outputs:
-                context_record: object
-                    description: "Agent_Context__c record returned by flow."
-                    complex_data_type_name: "lightning__recordInfoType"
+                agent_memory: string
+                    description: "Formatted merge of memory fields for personalization."
             target: "flow://Get_Agent_ContextObject"
 
     reasoning:
@@ -168,7 +162,7 @@ start_agent topic_selector:
             if @variables.context_loaded == False and @variables.ContactId and @variables.ContactId != "":
                 run @actions.load_user_memory
                     with contact_id=@variables.ContactId
-                    set @variables.agent_context=@outputs.context_record
+                    set @variables.agent_memory=@outputs.agent_memory
                     set @variables.context_loaded=True
 
             # Fallback simply flips the guard to avoid repeated attempts.

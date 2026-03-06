@@ -32,16 +32,17 @@ Memory is persisted in Salesforce (`Agent_Context__c`) and loaded at session sta
 
 - **Agent Script**: deterministic startup + conversational behavior
 - **Custom Object**: `Agent_Context__c`
-- **Read Flow**: `Get_Agent_ContextObject`
-- **Write Flow**: `Save_Agent_ContextObject`
+- **Read Flow**: `Get_Agent_ContextObject` (invokes `LoadAgentMemory` Apex)
+- **Write Flow**: `Save_Agent_ContextObject` (invokes `SaveAgentContext` Apex)
 
 ### Runtime sequence
 
 1. `start_agent topic_selector` executes first.
 2. It calls `flow://Get_Agent_ContextObject` once per session.
-3. Flow output record is mapped once to a mutable object variable (`agent_context`).
-4. Agent transitions to `topic general_assistance`.
-5. On conversation end, `topic finalization` calls `flow://Save_Agent_ContextObject`.
+3. Flow invokes `LoadAgentMemory` Apex: loads record, formats fields into string, returns `agent_memory`.
+4. Agent maps `@outputs.agent_memory` to `@variables.agent_memory`.
+5. Agent transitions to `topic general_assistance`.
+6. On conversation end, `topic finalization` calls `flow://Save_Agent_ContextObject` with scalar inputs.
 
 ---
 
@@ -66,26 +67,32 @@ Recommendation:
 
 ## 4.1 `Get_Agent_ContextObject` (read)
 
-Input:
+Inputs:
 
 - `contact_id` (Text)
+- `variable_name` (Text, optional, default: agent_memory)
 
 Outputs:
 
-- `context_record` (Record: `Agent_Context__c`)
+- `agent_memory` (Text) — formatted merge of all memory fields
+- `memory_summary`, `memory_goal`, `memory_has_issue`, `memory_style` (for checkpoint agents)
 
 Behavior:
 
-- Query `Agent_Context__c` by `Contact__c = contact_id`
-- Return the first matching record as `context_record`
-- Agent Script reads fields from `@variables.agent_context.data.<FieldApiName>`
+- Invokes `LoadAgentMemory` Apex action
+- Apex queries `Agent_Context__c` by `Contact__c = contact_id`
+- Apex formats fields into a string and returns `agent_memory`
+- Agent Script uses `@variables.agent_memory` in prompts
 
 ## 4.2 `Save_Agent_ContextObject` (write)
 
 Inputs:
 
 - `contact_id` (Text)
-- `context_record` (Record: `Agent_Context__c`)
+- `new_summary` (Text)
+- `new_goal` (Text)
+- `has_issue` (Boolean)
+- `new_style` (Text)
 
 Output:
 
@@ -93,10 +100,10 @@ Output:
 
 Behavior:
 
-- Find existing `Agent_Context__c` by `Contact__c = contact_id`
-- If found, update the existing record from `context_record` payload
-- If not found, create a new `Agent_Context__c` record
-- Persist the full object payload so new DMO fields can be read/write-enabled in script without changing this flow
+- Invokes `SaveAgentContext` Apex action
+- Apex finds existing `Agent_Context__c` by `Contact__c = contact_id`
+- If found, updates; if not found, creates new record
+- Persists scalar values only (no object payload)
 
 ---
 
@@ -108,7 +115,7 @@ Core session variables used by memory logic:
 
 - `ContactId` (mutable, test default in repo)
 - `context_loaded` (boolean guard)
-- `agent_context` (mutable object record payload)
+- `agent_memory` (mutable string — formatted merge of memory fields)
 
 Also kept:
 
@@ -123,7 +130,7 @@ In `start_agent topic_selector`, memory is loaded deterministically:
 
 - check `context_loaded == False`
 - run `@actions.load_user_memory`
-- map `@outputs.context_record` to `@variables.agent_context`
+- map `@outputs.agent_memory` to `@variables.agent_memory`
 - set `context_loaded = True`
 - transition to `@topic.general_assistance`
 
@@ -131,7 +138,8 @@ In `start_agent topic_selector`, memory is loaded deterministically:
 
 `topic general_assistance`:
 
-- uses `agent_context.data.*` fields in prompt instructions
+- uses `agent_memory` (formatted string) in prompt instructions
+- pattern: `Here is your past context. Use it for personalization:\n{!@variables.agent_memory}`
 - personalizes greeting and follow-up
 - exposes tools:
   - `escalate_to_human`
@@ -142,7 +150,7 @@ In `start_agent topic_selector`, memory is loaded deterministically:
 `topic finalization`:
 
 - calls `save_context_tool` (bound to `Save_Agent_ContextObject`)
-- `save_context_tool` provides the full `context_record` object payload
+- `save_context_tool` provides scalar inputs: `new_summary`, `new_goal`, `has_issue`, `new_style`
 - `contact_id` remains deterministic from variables
 - says goodbye
 
@@ -155,9 +163,9 @@ These are the key implementation rules that avoided runtime failures:
 1. **Map flow outputs inside the `run` block**
   - Keep `set @variables...=@outputs...` indented under `run @actions...`.
   - This is the most important stability fix.
-2. **Use `recordInfo` shape correctly in prompts**
-  - Object outputs from flow are record payloads with fields under `.data`.
-  - Use `@variables.agent_context.data.Communication_Style__c` (not `@variables.agent_context.Communication_Style__c`).
+2. **Use `agent_memory` for personalization**
+  - Load flow returns a formatted string from `LoadAgentMemory` Apex.
+  - Use `@variables.agent_memory` directly in prompts: `Here is your past context. Use it for personalization:\n{!@variables.agent_memory}`.
 3. **Avoid dynamic merge expressions in `system.instructions`**
   - Keep system instructions stable/plain.
   - Put personalization instructions in topic reasoning where state is available.
@@ -178,6 +186,7 @@ Agent runtime user needs:
 - field-level permissions for all used fields
 - read access to `Contact` when flow/filter requires it
 - `RunFlow` permission
+- Apex class access: `LoadAgentMemory`, `SaveAgentContext`
 
 Flow recommendations:
 
@@ -212,7 +221,7 @@ sf agent publish authoring-bundle --api-name ltm_agent --target-org my-org
 - Confirm trace shows:
   - successful `FunctionStep` for `load_user_memory`
   - no generic fallback error
-  - personalized response referencing memory fields
+  - personalized response referencing `agent_memory` content
 
 ---
 

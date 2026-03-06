@@ -109,7 +109,7 @@ The agent logic lives in the `.agent` file:
 force-app/main/default/aiAuthoringBundles/<api-name>/<api-name>.agent
 ```
 
-Edit topics, actions, variables, and instructions. Use the [Agent Script Manual](Agent%20Script%20Manual%20v3.md) for syntax.
+Edit topics, actions, variables, and instructions. Use the [Agent Script Manual](Agent%20Script%20Manual%20v4.md) for syntax.
 
 ---
 
@@ -139,12 +139,11 @@ sf project deploy start --target-org my-org
 
 ## 6. Create Flows (if required)
 
-If your agent calls Flows (e.g. `flow://Get_Agent_ContextObject` or `flow://Save_Agent_ContextObject`), create them in the org before publishing.
+If your agent calls Flows (e.g. `flow://Get_Agent_ContextObject` or `flow://Save_Agent_ContextObject`), deploy them before publishing.
 
-- Go to **Setup** → **Flows** → **New Flow** → **Autolaunched Flow**
-- Follow [FLOWS_SETUP.md](FLOWS_SETUP.md) for the LTM agent flows
-
-Flows are typically created manually; they are not always stored in the project.
+- The LTM agent flows are **Apex-backed** and stored in the project (`force-app/main/default/flows/`)
+- Deploy with: `sf project deploy start --source-dir force-app/main/default`
+- Follow [FLOWS_SETUP.md](FLOWS_SETUP.md) for the LTM agent flow contracts and Apex requirements
 
 ---
 

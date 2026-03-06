@@ -7,7 +7,6 @@
         <name>ltm_agent_test</name>
     </botMlDomain>
     <botSource>None</botSource>
-    <botUser>ltm_agent@00dky00000gxhj51777765750.ext</botUser>
     <description>Minimal test agent for object-based memory mapping.</description>
     <label>ltm-agent-test</label>
     <logPrivateConversationData>false</logPrivateConversationData>

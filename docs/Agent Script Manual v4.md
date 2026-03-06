@@ -355,46 +355,49 @@ Use to avoid conflicts between global system tone/rules and topic needs.
 
 ## 13) Long-Term Memory Reference Architecture (This Repo)
 
-This project implements persistent memory with object payload contracts.
+This project implements persistent memory with Apex-backed flows that return a formatted string (`agent_memory`).
 
 ### 13.1 Data and Actions
 
 - Object: `Agent_Context__c`
-- Read flow target: `flow://Get_Agent_ContextObject`
-- Save flow target: `flow://Save_Agent_ContextObject`
+- Read flow target: `flow://Get_Agent_ContextObject` (invokes `LoadAgentMemory` Apex)
+- Save flow target: `flow://Save_Agent_ContextObject` (invokes `SaveAgentContext` Apex)
 
 ### 13.2 Read Contract
 
-- Input: `contact_id` (Text)
-- Output: `context_record` (SObject `Agent_Context__c`)
+- Inputs: `contact_id` (Text), `variable_name` (Text, optional, default: agent_memory)
+- Outputs: `agent_memory` (Text — formatted merge of memory fields), plus `memory_summary`, `memory_goal`, `memory_has_issue`, `memory_style` for checkpoint agents
 
 ### 13.3 Save Contract
 
 - Inputs:
   - `contact_id`
-  - `context_record` (SObject payload)
   - `new_summary`
   - `new_goal`
   - `has_issue`
   - `new_style`
 - Output: `success` (Boolean)
 
+No `context_record` object — save uses scalar inputs only.
+
 ### 13.4 Script Pattern Used
 
 1. `start_agent` performs one-time load (guarded by `context_loaded`)
-2. flow output mapped once into `@variables.agent_context`
-3. topic reasoning personalizes using `agent_context.data.*`
+2. flow output mapped once into `@variables.agent_memory`
+3. topic reasoning personalizes using `agent_memory` (formatted string)
 4. checkpoint saves triggered when `context_dirty == True`
 5. finalization performs a final deterministic save
 
-### 13.5 Object Payload Access Rule
+### 13.5 Agent Memory Format Rule
 
-For `lightning__recordInfoType`, access fields under `.data`:
-- `@variables.agent_context.data.Communication_Style__c`
-- `@variables.agent_context.data.User_Tier__c`
-- etc.
+Use the formatted string directly in prompts:
 
-Do not omit `.data`.
+```yaml
+| Here is your past context. Use it for personalization:
+| {!@variables.agent_memory}
+```
+
+The `LoadAgentMemory` Apex composes all memory fields into this string. Do not access `.data` — the object is not stored in a variable.
 
 ### 13.6 Mapping Rule (Critical)
 
@@ -403,7 +406,7 @@ Set outputs in the same `run` block:
 ```yaml
 run @actions.load_user_memory
     with contact_id=@variables.ContactId
-    set @variables.agent_context=@outputs.context_record
+    set @variables.agent_memory=@outputs.agent_memory
     set @variables.context_loaded=True
 ```
 
