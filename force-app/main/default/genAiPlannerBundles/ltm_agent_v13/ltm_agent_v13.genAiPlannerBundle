@@ -32,7 +32,7 @@ If the user is a VIP, provide premium, highly detailed white-glove service.</des
             <fullName>fetch_user_context_179KY000000Lu6K</fullName>
             <description>Fetches the user&apos;s permanent memory profile from the database.</description>
             <developerName>fetch_user_context_179KY000000Lu6K</developerName>
-            <invocationTarget>Get_Agent_Context</invocationTarget>
+            <invocationTarget>Get_Agent_ContextObject</invocationTarget>
             <invocationTargetType>flow</invocationTargetType>
             <isConfirmationRequired>false</isConfirmationRequired>
             <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
@@ -84,7 +84,7 @@ If the user is a VIP, provide premium, highly detailed white-glove service.</des
             <fullName>save_user_context_179KY000000Lu6M</fullName>
             <description>Saves the conversation summary and context to the database.</description>
             <developerName>save_user_context_179KY000000Lu6M</developerName>
-            <invocationTarget>Save_Agent_Context</invocationTarget>
+            <invocationTarget>Save_Agent_ContextObject</invocationTarget>
             <invocationTargetType>flow</invocationTargetType>
             <isConfirmationRequired>false</isConfirmationRequired>
             <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>

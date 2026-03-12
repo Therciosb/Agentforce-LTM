@@ -137,13 +137,13 @@ sf project deploy start --target-org my-org
 
 ---
 
-## 6. Create Flows (if required)
+## 6. Deploy Apex and Metadata (if required)
 
-If your agent calls Flows (e.g. `flow://Get_Agent_ContextObject` or `flow://Save_Agent_ContextObject`), deploy them before publishing.
+If your agent calls Apex actions (e.g. `apex://LoadAgentMemory` or `apex://SaveAgentContext`), deploy the Apex classes and dependencies before publishing.
 
-- The LTM agent flows are **Apex-backed** and stored in the project (`force-app/main/default/flows/`)
+- The LTM agents use **Apex invocable actions** directly (`LoadAgentMemory`, `SaveAgentContext`)
 - Deploy with: `sf project deploy start --source-dir force-app/main/default`
-- Follow [FLOWS_SETUP.md](FLOWS_SETUP.md) for the LTM agent flow contracts and Apex requirements
+- Follow [FLOWS_SETUP.md](FLOWS_SETUP.md) for Apex contracts, optional Flow wrappers, and permission setup
 
 ---
 
@@ -260,4 +260,4 @@ sf agent preview --api-name my_agent --target-org my-org
 | "No access to Einstein Copilot" | User needs Einstein Copilot license; enable Agentforce in Setup |
 | "This Agent Type should have a user assigned" | Set `default_agent_user` in the agent script to a real org username |
 | "Permission set license doesn't match" | Create a permission set with the Einstein Agent license for the agent user |
-| Flow fails with null contact_id | Ensure ContactId is populated (pre-chat, MEU update) or handle null in the agent script |
+| Action fails with null contactId | Ensure ContactId is populated (pre-chat, MEU update) or handle null in the agent script |

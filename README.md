@@ -2,14 +2,14 @@
 
 AI Agent with **long-term persistent memory** for personalized, context-aware conversations on Salesforce Agentforce.
 
-The agent remembers prior conversation summaries, resumes unfinished goals, detects unresolved issues, and adapts tone by communication style and user tier. Memory is persisted in a custom object (`Agent_Context__c`) and loaded at session start via flows.
+The agent remembers prior conversation summaries, resumes unfinished goals, detects unresolved issues, and adapts tone by communication style and user tier. Memory is persisted in a custom object (`Agent_Context__c`) and loaded at session start via Apex invocable actions.
 
 ## Features
 
 - **Persistent memory** — Stores conversation context per Contact in Salesforce
 - **Personalization** — Adapts responses based on communication style, tier, and prior context
 - **Checkpoint saves** — `ltm_agent_checkpoint` variant saves memory during conversation, not only at end
-- **Flow-based** — Uses `Get_Agent_ContextObject` and `Save_Agent_ContextObject` flows for read/write
+- **Apex-based** — Uses `LoadAgentMemory` and `SaveAgentContext` Apex invocable actions for read/write
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ The agent remembers prior conversation summaries, resumes unfinished goals, dete
    sf project deploy start --source-dir force-app/main/default/objects --target-org my-org
    ```
 
-3. **Create the Flows** — Follow [docs/FLOWS_SETUP.md](docs/FLOWS_SETUP.md) to create `Get_Agent_ContextObject` and `Save_Agent_ContextObject` in your org.
+3. **Deploy Apex and metadata** — Follow [docs/FLOWS_SETUP.md](docs/FLOWS_SETUP.md) for Apex setup, optional Flow wrappers, and permissions.
 
 4. **Deploy metadata and publish the agent**:
    ```bash
@@ -44,7 +44,7 @@ The agent remembers prior conversation summaries, resumes unfinished goals, dete
 | Document | Description |
 |----------|--------------|
 | [docs/QUICK_GUIDE.md](docs/QUICK_GUIDE.md) | End-to-end setup from project creation to activation |
-| [docs/FLOWS_SETUP.md](docs/FLOWS_SETUP.md) | Flow creation for Get/Save Agent Context |
+| [docs/FLOWS_SETUP.md](docs/FLOWS_SETUP.md) | Apex setup and optional Flow wrappers for Agent Context |
 | [docs/LTM_AGENT_PERSISTENT_MEMORY_GUIDE.md](docs/LTM_AGENT_PERSISTENT_MEMORY_GUIDE.md) | Architecture and implementation details |
 | [specs/ltm_agent_persistent_memory_spec.md](specs/ltm_agent_persistent_memory_spec.md) | Full specification |
 
@@ -67,7 +67,7 @@ scripts/                    # Test and seed scripts
 | Script | Purpose |
 |--------|---------|
 | `scripts/seed-agent-context.sh` | Seed `Agent_Context__c` with test data (requires `SF_CONTACT_1`, `SF_CONTACT_2`, `SF_CONTACT_3`) |
-| `scripts/test-flow-with-contact.sh` | Test Get_Agent_Context flow |
+| `scripts/test-flow-with-contact.sh` | Test Get_Agent_ContextObject flow |
 | `scripts/test-agent-api-with-contact.js` | Test agent via Agent API with Contact context |
 
 Set `SF_TARGET_ORG` (default: `my-org`) and Contact IDs via environment variables. See [.env.example](.env.example).

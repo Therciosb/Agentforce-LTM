@@ -4,15 +4,15 @@
 # Purpose
 # - Demonstrates how to implement long-term memory in Agentforce using:
 #   1) Mutable variables for in-session state
-#   2) Apex-backed Flow actions for persistent read/write
+#   2) Apex invocable actions (LoadAgentMemory, SaveAgentContext) for persistent read/write
 #   3) Deterministic startup logic before conversational reasoning
 #
 # High-level flow
 # 1) start_agent.topic_selector runs first
-# 2) It loads user memory from flow://Get_Agent_ContextObject (once per session)
+# 2) It loads user memory from apex://LoadAgentMemory (once per session)
 # 3) It stores the formatted string in agent_memory
 # 4) general_assistance personalizes responses from agent_memory
-# 5) finalization saves context to flow://Save_Agent_ContextObject
+# 5) finalization saves context to apex://SaveAgentContext
 # -----------------------------------------------------------------------------
 
 system:
@@ -28,14 +28,9 @@ system:
         error: "Sorry, it looks like something has gone wrong."
 
 config:
-    # Unique API developer name for this agent.
     developer_name: "ltm_agent"
-    # Runtime user that executes actions/flows for this agent.
-    # Replace YOUR_ORG_ID with your org ID (Setup > Company Information, or: sf org display --json | jq -r '.result.orgId')
-    default_agent_user: "ltm_agent@YOUR_ORG_ID.ext"
-    # Human-readable label shown in setup UIs.
+    default_agent_user: "ltm_agent@00dky00000gxhj51777765750.ext"
     agent_label: "ltm-agent"
-    # Short functional description.
     description: "Engage with users responding questions regarding products and services"
 
 variables:
@@ -49,15 +44,18 @@ variables:
 
     # ContactId is mutable by design in this educational project so it can be
     # hardcoded for testing and later replaced by linked context in production.
-    # Replace with a Contact ID from your org (create test Contacts first).
-    ContactId: mutable string = "YOUR_CONTACT_ID"
-        description: "Resolved contact id used by flow actions."
+    # Available CRM test Contact IDs:
+    # - 003KY00000KNAGpYAP
+    # - 003KY00000KNAGqYAP
+    # - 003KY00000KNAGrYAP
+    ContactId: mutable string = "003KY00000KNAGpYAP"
+        description: "Resolved contact id used by Apex actions."
 
     # Guard flag to prevent repeated memory fetch calls in a single session.
     context_loaded: mutable boolean = False
         description: "Prevents duplicate context fetch in the same session."
 
-    # Formatted string from Get_Agent_ContextObject (LoadAgentMemory Apex).
+    # Formatted string from LoadAgentMemory Apex.
     agent_memory: mutable string = ""
         description: "Formatted merge of Agent_Context__c fields for profile personalization."
 
@@ -95,46 +93,46 @@ topic finalization:
     description: "Summarizes and saves conversation context."
 
     actions:
-        # Flow action for writing long-term memory (Apex-backed).
+        # Save context via SaveAgentContext Apex.
         save_user_context:
             description: "Saves Agent_Context__c using extracted memory fields."
             inputs:
-                contact_id: string
+                contactId: string
                     description: "The user's Contact ID."
-                new_summary: string
+                newSummary: string
                     description: "Concise summary of this conversation."
-                new_goal: string
+                newGoal: string
                     description: "Unfinished goal from this conversation, or empty string."
-                has_issue: boolean
+                hasIssue: boolean
                     description: "True if the user still has an unresolved issue."
-                new_style: string
+                newStyle: string
                     description: "Preferred communication style inferred from this conversation."
             outputs:
                 success: boolean
                     description: "Whether save succeeded."
-            target: "flow://Save_Agent_ContextObject"
+            target: "apex://SaveAgentContext"
 
     reasoning:
         instructions: ->
             # Finalization must persist memory through the save tool before goodbye.
             | Before saying goodbye, call {!@actions.save_context_tool} exactly once to persist memory.
-            | Generate these values from this conversation and pass all of them when calling save_context_tool: new_summary, new_goal, has_issue, and new_style.
+            | Generate these values from this conversation and pass all of them when calling save_context_tool: newSummary, newGoal, hasIssue, and newStyle.
             | Required extraction rules:
-            | - new_summary: concise 3-5 sentence summary of what happened in this session.
-            | - new_goal: unfinished user goal to continue later, or empty string if none.
-            | - has_issue: true only if the user still has unresolved issues at the end of the session.
-            | - new_style: communication preference inferred from this session (for example, concise, detailed, formal).
+            | - newSummary: concise 3-5 sentence summary of what happened in this session.
+            | - newGoal: unfinished user goal to continue later, or empty string if none.
+            | - hasIssue: true only if the user still has unresolved issues at the end of the session.
+            | - newStyle: communication preference inferred from this session (for example, concise, detailed, formal).
             | Never call save_context_tool with empty arguments. Always include values for all required extracted fields.
             | After the tool returns, give a warm goodbye and confirm context is saved.
         actions:
             # Persist context using LLM-extracted fields.
             save_context_tool: @actions.save_user_context
                 description: "Required at session end. Save context with extracted summary, goal, unresolved-issue flag, and communication style."
-                with contact_id=@variables.ContactId
-                with new_summary=...
-                with new_goal=...
-                with has_issue=...
-                with new_style=...
+                with contactId=@variables.ContactId
+                with newSummary=...
+                with newGoal=...
+                with hasIssue=...
+                with newStyle=...
 
 # NOTE: Keep start_agent as the LAST topic block in this file.
 start_agent topic_selector:
@@ -143,26 +141,24 @@ start_agent topic_selector:
     description: "Fetches user context and routes to main assistance."
 
     actions:
-        # Read flow action (persistent memory lookup via LoadAgentMemory Apex).
+        # Load memory via LoadAgentMemory Apex.
         load_user_memory:
             description: "Fetches the user's long-term context from the database."
             inputs:
-                contact_id: string
+                contactId: string
                     description: "The user's Contact ID."
-                variable_name: string
-                    description: "Target variable name (default: agent_memory)."
             outputs:
-                agent_memory: string
+                agentMemory: string
                     description: "Formatted merge of memory fields for personalization."
-            target: "flow://Get_Agent_ContextObject"
+            target: "apex://LoadAgentMemory"
 
     reasoning:
         instructions: ->
             # Keep variable mapping inside the run block for deterministic state.
             if @variables.context_loaded == False and @variables.ContactId and @variables.ContactId != "":
                 run @actions.load_user_memory
-                    with contact_id=@variables.ContactId
-                    set @variables.agent_memory=@outputs.agent_memory
+                    with contactId=@variables.ContactId
+                    set @variables.agent_memory=@outputs.agentMemory
                     set @variables.context_loaded=True
 
             # Fallback simply flips the guard to avoid repeated attempts.

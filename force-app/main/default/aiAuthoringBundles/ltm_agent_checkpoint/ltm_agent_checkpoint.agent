@@ -20,14 +20,10 @@ system:
 # Agentforce metadata identity for this bundle in the org.
 config:
     developer_name: "ltm_agent_checkpoint"
-    # Replace YOUR_ORG_ID with your org ID (Setup > Company Information)
-    default_agent_user: "ltm_agent@YOUR_ORG_ID.ext"
+    default_agent_user: "ltm_agent@00dky00000gxhj51777765750.ext"
     agent_label: "ltm-agent-checkpoint"
     description: "LTM agent with deterministic checkpoint saves during conversation."
 
-# Runtime state model:
-# - Linked vars come from Messaging Session context.
-# - Mutable vars hold loaded profile data and checkpoint memory state.
 variables:
     EndUserId: linked string
         source: @MessagingSession.MessagingEndUserId
@@ -36,14 +32,22 @@ variables:
         source: @MessagingSession.Id
         description: "Messaging session id."
 
-    ContactId: mutable string = "YOUR_CONTACT_ID"
-        description: "Resolved contact id used by flow actions."
+    
+    
+    # ContactId is mutable by design in this educational project so it can be
+    # hardcoded for testing and later replaced by linked context in production.
+    # Available CRM test Contact IDs:
+    # - 003KY00000KNAGpYAP
+    # - 003KY00000KNAGqYAP
+    # - 003KY00000KNAGrYAP
+    ContactId: mutable string = "003KY00000KNAGqYAP"
+        description: "Resolved contact id used by Apex actions."
     context_loaded: mutable boolean = False
         description: "Prevents duplicate context fetch in the same session."
     context_dirty: mutable boolean = False
         description: "True when memory values changed and must be checkpoint-saved."
 
-    # Formatted string from Get_Agent_ContextObject (LoadAgentMemory Apex).
+    # Formatted string from LoadAgentMemory Apex.
     agent_memory: mutable string = ""
         description: "Formatted merge of memory fields for personalization."
 
@@ -72,20 +76,20 @@ topic general_assistance:
         save_user_context:
             description: "Saves Agent_Context__c using extracted memory fields."
             inputs:
-                contact_id: string
+                contactId: string
                     description: "The user's Contact ID."
-                new_summary: string
+                newSummary: string
                     description: "Add 1-3 sentences about user responses and assistant recommendations."
-                new_goal: string
+                newGoal: string
                     description: "Unfinished goal from this conversation, or empty string."
-                has_issue: boolean
+                hasIssue: boolean
                     description: "True if the user still has an unresolved issue."
-                new_style: string
+                newStyle: string
                     description: "Preferred communication style inferred from this conversation."
             outputs:
                 success: boolean
                     description: "Whether save succeeded."
-            target: "flow://Save_Agent_ContextObject"
+            target: "apex://SaveAgentContext"
 
     # Main conversational instructions:
     # - personalize from loaded memory (agent_memory)
@@ -127,11 +131,11 @@ topic general_assistance:
     after_reasoning:
         if @variables.context_dirty == True:
             run @actions.save_user_context
-                with contact_id=@variables.ContactId
-                with new_summary=@variables.memory_summary
-                with new_goal=@variables.memory_goal
-                with has_issue=@variables.memory_has_issue
-                with new_style=@variables.memory_style
+                with contactId=@variables.ContactId
+                with newSummary=@variables.memory_summary
+                with newGoal=@variables.memory_goal
+                with hasIssue=@variables.memory_has_issue
+                with newStyle=@variables.memory_style
                 set @variables.context_dirty=False
 
 topic finalization:
@@ -142,30 +146,30 @@ topic finalization:
         save_user_context:
             description: "Saves Agent_Context__c using extracted memory fields."
             inputs:
-                contact_id: string
+                contactId: string
                     description: "The user's Contact ID."
-                new_summary: string
+                newSummary: string
                     description: "Detailed 3-5 sentences summary considering previous facts."
-                new_goal: string
+                newGoal: string
                     description: "Unfinished goal from this conversation, or empty string."
-                has_issue: boolean
+                hasIssue: boolean
                     description: "True if the user still has an unresolved issue."
-                new_style: string
+                newStyle: string
                     description: "Preferred communication style inferred from this conversation."
             outputs:
                 success: boolean
                     description: "Whether save succeeded."
-            target: "flow://Save_Agent_ContextObject"
+            target: "apex://SaveAgentContext"
 
     # Deterministic final save path:
     reasoning:
         instructions: ->
             run @actions.save_user_context
-                with contact_id=@variables.ContactId
-                with new_summary=@variables.memory_summary
-                with new_goal=@variables.memory_goal
-                with has_issue=@variables.memory_has_issue
-                with new_style=@variables.memory_style
+                with contactId=@variables.ContactId
+                with newSummary=@variables.memory_summary
+                with newGoal=@variables.memory_goal
+                with hasIssue=@variables.memory_has_issue
+                with newStyle=@variables.memory_style
                 set @variables.context_dirty=False
 
             | Give a warm goodbye and confirm context is saved.
@@ -179,36 +183,36 @@ start_agent topic_selector:
         load_user_memory_checkpoint:
             description: "Fetches the user's long-term context from the database."
             inputs:
-                contact_id: string
+                contactId: string
                     description: "The user's Contact ID."
             outputs:
-                agent_memory: string
+                agentMemory: string
                     description: "Formatted merge of memory fields for personalization."
-                memory_summary: string
+                memorySummary: string
                     description: "Last topic summary from loaded context."
-                memory_goal: string
+                memoryGoal: string
                     description: "Pending goal from loaded context."
-                memory_has_issue: boolean
+                hasIssue: boolean
                     description: "Unresolved issue flag from loaded context."
-                memory_style: string
+                memoryStyle: string
                     description: "Communication style from loaded context."
-            target: "flow://Get_Agent_ContextObject"
+            target: "apex://LoadAgentMemory"
 
     # Startup sequence:
     # - load context once when ContactId exists
-    # - initialize working memory from flow outputs
+    # - initialize working memory from Apex outputs
     # - mark loaded to avoid duplicate fetches
     # - hand off to general assistance
     reasoning:
         instructions: ->
             if @variables.context_loaded == False and @variables.ContactId and @variables.ContactId != "":
                 run @actions.load_user_memory_checkpoint
-                    with contact_id=@variables.ContactId
-                    set @variables.agent_memory=@outputs.agent_memory
-                    set @variables.memory_summary=@outputs.memory_summary
-                    set @variables.memory_goal=@outputs.memory_goal
-                    set @variables.memory_has_issue=@outputs.memory_has_issue
-                    set @variables.memory_style=@outputs.memory_style
+                    with contactId=@variables.ContactId
+                    set @variables.agent_memory=@outputs.agentMemory
+                    set @variables.memory_summary=@outputs.memorySummary
+                    set @variables.memory_goal=@outputs.memoryGoal
+                    set @variables.memory_has_issue=@outputs.hasIssue
+                    set @variables.memory_style=@outputs.memoryStyle
                     set @variables.context_loaded=True
 
             if @variables.context_loaded == False:

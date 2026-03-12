@@ -31,7 +31,7 @@ Adapt your tone and depth to the user&apos;s communication style and service tie
             <fullName>load_user_memory_179KY000000Lu6z</fullName>
             <description>Fetches the user&apos;s long-term context from the database.</description>
             <developerName>load_user_memory_179KY000000Lu6z</developerName>
-            <invocationTarget>Get_Agent_Context</invocationTarget>
+            <invocationTarget>Get_Agent_ContextObject</invocationTarget>
             <invocationTargetType>flow</invocationTargetType>
             <isConfirmationRequired>false</isConfirmationRequired>
             <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
@@ -81,7 +81,7 @@ Adapt your tone and depth to the user&apos;s communication style and service tie
             <fullName>save_user_context_179KY000000Lu70</fullName>
             <description>Saves the conversation summary and context to the database.</description>
             <developerName>save_user_context_179KY000000Lu70</developerName>
-            <invocationTarget>Save_Agent_Context</invocationTarget>
+            <invocationTarget>Save_Agent_ContextObject</invocationTarget>
             <invocationTargetType>flow</invocationTargetType>
             <isConfirmationRequired>false</isConfirmationRequired>
             <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>

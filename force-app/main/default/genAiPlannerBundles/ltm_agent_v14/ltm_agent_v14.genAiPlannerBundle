@@ -30,7 +30,7 @@
             <fullName>save_user_context_179KY000000Lu6P</fullName>
             <description>Saves conversation to the database.</description>
             <developerName>save_user_context_179KY000000Lu6P</developerName>
-            <invocationTarget>Save_Agent_Context</invocationTarget>
+            <invocationTarget>Save_Agent_ContextObject</invocationTarget>
             <invocationTargetType>flow</invocationTargetType>
             <isConfirmationRequired>false</isConfirmationRequired>
             <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
@@ -41,7 +41,7 @@
             <fullName>fetch_user_context_179KY000000Lu6P</fullName>
             <description>Fetches user&apos;s memory from the database.</description>
             <developerName>fetch_user_context_179KY000000Lu6P</developerName>
-            <invocationTarget>Get_Agent_Context</invocationTarget>
+            <invocationTarget>Get_Agent_ContextObject</invocationTarget>
             <invocationTargetType>flow</invocationTargetType>
             <isConfirmationRequired>false</isConfirmationRequired>
             <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>
@@ -72,7 +72,7 @@
             <fullName>save_user_context_179KY000000Lu6Q</fullName>
             <description>Saves conversation to the database.</description>
             <developerName>save_user_context_179KY000000Lu6Q</developerName>
-            <invocationTarget>Save_Agent_Context</invocationTarget>
+            <invocationTarget>Save_Agent_ContextObject</invocationTarget>
             <invocationTargetType>flow</invocationTargetType>
             <isConfirmationRequired>false</isConfirmationRequired>
             <isIncludeInProgressIndicator>false</isIncludeInProgressIndicator>

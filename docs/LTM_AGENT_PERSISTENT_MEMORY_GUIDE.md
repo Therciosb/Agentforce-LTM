@@ -22,7 +22,7 @@ Enable long-term memory for Agentforce so the agent can:
 - detect unresolved issues
 - adapt tone by communication style and user tier
 
-Memory is persisted in Salesforce (`Agent_Context__c`) and loaded at session start through flows.
+Memory is persisted in Salesforce (`Agent_Context__c`) and loaded at session start through Apex invocable actions.
 
 ---
 
@@ -32,17 +32,17 @@ Memory is persisted in Salesforce (`Agent_Context__c`) and loaded at session sta
 
 - **Agent Script**: deterministic startup + conversational behavior
 - **Custom Object**: `Agent_Context__c`
-- **Read Flow**: `Get_Agent_ContextObject` (invokes `LoadAgentMemory` Apex)
-- **Write Flow**: `Save_Agent_ContextObject` (invokes `SaveAgentContext` Apex)
+- **Read Action**: `apex://LoadAgentMemory` — loads record, formats fields, returns `agentMemory`
+- **Write Action**: `apex://SaveAgentContext` — creates or updates `Agent_Context__c`
 
 ### Runtime sequence
 
 1. `start_agent topic_selector` executes first.
-2. It calls `flow://Get_Agent_ContextObject` once per session.
-3. Flow invokes `LoadAgentMemory` Apex: loads record, formats fields into string, returns `agent_memory`.
-4. Agent maps `@outputs.agent_memory` to `@variables.agent_memory`.
+2. It calls `apex://LoadAgentMemory` once per session (with `contactId`).
+3. Apex loads record, formats fields into string, returns `agentMemory`.
+4. Agent maps `@outputs.agentMemory` to `@variables.agent_memory`.
 5. Agent transitions to `topic general_assistance`.
-6. On conversation end, `topic finalization` calls `flow://Save_Agent_ContextObject` with scalar inputs.
+6. On conversation end, `topic finalization` calls `apex://SaveAgentContext` with scalar inputs (`contactId`, `newSummary`, `newGoal`, `hasIssue`, `newStyle`).
 
 ---
 
@@ -63,36 +63,34 @@ Recommendation:
 
 ---
 
-## 4) Flow Contracts
+## 4) Apex Action Contracts
 
-## 4.1 `Get_Agent_ContextObject` (read)
+## 4.1 LoadAgentMemory (read)
 
 Inputs:
 
-- `contact_id` (Text)
-- `variable_name` (Text, optional, default: agent_memory)
+- `contactId` (Text)
 
 Outputs:
 
-- `agent_memory` (Text) — formatted merge of all memory fields
-- `memory_summary`, `memory_goal`, `memory_has_issue`, `memory_style` (for checkpoint agents)
+- `agentMemory` (Text) — formatted merge of all memory fields
+- `memorySummary`, `memoryGoal`, `hasIssue`, `memoryStyle` (for checkpoint agents)
 
 Behavior:
 
-- Invokes `LoadAgentMemory` Apex action
-- Apex queries `Agent_Context__c` by `Contact__c = contact_id`
-- Apex formats fields into a string and returns `agent_memory`
-- Agent Script uses `@variables.agent_memory` in prompts
+- Apex queries `Agent_Context__c` by `Contact__c = contactId`
+- Apex formats fields into a string and returns `agentMemory`
+- Agent Script maps to `@variables.agent_memory` and uses it in prompts
 
-## 4.2 `Save_Agent_ContextObject` (write)
+## 4.2 SaveAgentContext (write)
 
 Inputs:
 
-- `contact_id` (Text)
-- `new_summary` (Text)
-- `new_goal` (Text)
-- `has_issue` (Boolean)
-- `new_style` (Text)
+- `contactId` (Text)
+- `newSummary` (Text)
+- `newGoal` (Text)
+- `hasIssue` (Boolean)
+- `newStyle` (Text)
 
 Output:
 
@@ -100,8 +98,7 @@ Output:
 
 Behavior:
 
-- Invokes `SaveAgentContext` Apex action
-- Apex finds existing `Agent_Context__c` by `Contact__c = contact_id`
+- Apex finds existing `Agent_Context__c` by `Contact__c = contactId`
 - If found, updates; if not found, creates new record
 - Persists scalar values only (no object payload)
 
@@ -129,8 +126,8 @@ Replace `YOUR_CONTACT_ID` in the agent script with a Contact ID from your org. C
 In `start_agent topic_selector`, memory is loaded deterministically:
 
 - check `context_loaded == False`
-- run `@actions.load_user_memory`
-- map `@outputs.agent_memory` to `@variables.agent_memory`
+- run `@actions.load_user_memory` with `contactId=@variables.ContactId`
+- map `@outputs.agentMemory` to `@variables.agent_memory`
 - set `context_loaded = True`
 - transition to `@topic.general_assistance`
 
@@ -149,9 +146,9 @@ In `start_agent topic_selector`, memory is loaded deterministically:
 
 `topic finalization`:
 
-- calls `save_context_tool` (bound to `Save_Agent_ContextObject`)
-- `save_context_tool` provides scalar inputs: `new_summary`, `new_goal`, `has_issue`, `new_style`
-- `contact_id` remains deterministic from variables
+- calls `save_context_tool` (bound to `apex://SaveAgentContext`)
+- `save_context_tool` provides scalar inputs: `newSummary`, `newGoal`, `hasIssue`, `newStyle`
+- `contactId` is passed from `@variables.ContactId`
 - says goodbye
 
 ---
@@ -160,11 +157,11 @@ In `start_agent topic_selector`, memory is loaded deterministically:
 
 These are the key implementation rules that avoided runtime failures:
 
-1. **Map flow outputs inside the `run` block**
+1. **Map action outputs inside the `run` block**
   - Keep `set @variables...=@outputs...` indented under `run @actions...`.
   - This is the most important stability fix.
 2. **Use `agent_memory` for personalization**
-  - Load flow returns a formatted string from `LoadAgentMemory` Apex.
+  - Load action returns a formatted string from `LoadAgentMemory` Apex (`agentMemory` output).
   - Use `@variables.agent_memory` directly in prompts: `Here is your past context. Use it for personalization:\n{!@variables.agent_memory}`.
 3. **Avoid dynamic merge expressions in `system.instructions`**
   - Keep system instructions stable/plain.
@@ -173,8 +170,8 @@ These are the key implementation rules that avoided runtime failures:
   - Required by current team convention and avoids parser/ordering confusion.
 5. **Avoid duplicate context variable mappings**
   - Do not map the same context source twice (for example MessagingEndUser Contact mapping collisions).
-6. **Flow success does not guarantee reasoning success**
-  - If flow returns valid outputs but response is generic error, inspect reasoning path and output mapping order.
+6. **Action success does not guarantee reasoning success**
+  - If the action returns valid outputs but response is generic error, inspect reasoning path and output mapping order.
 
 ---
 
@@ -184,14 +181,10 @@ Agent runtime user needs:
 
 - object permissions on `Agent_Context__c` (read/create/edit as needed)
 - field-level permissions for all used fields
-- read access to `Contact` when flow/filter requires it
-- `RunFlow` permission
+- read access to `Contact` when Apex queries require it
 - Apex class access: `LoadAgentMemory`, `SaveAgentContext`
 
-Flow recommendations:
-
-- activated versions in org
-- run mode configured appropriately for your security model
+Assign the `Agent_Context_Access_Agent_User` permission set to the agent user.
 
 ---
 
@@ -227,7 +220,7 @@ sf agent publish authoring-bundle --api-name ltm_agent --target-org my-org
 
 ## 9) Troubleshooting
 
-## Symptom: Generic error right after successful memory flow step
+## Symptom: Generic error right after successful memory action step
 
 Likely causes:
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Verifies Get_Agent_Context flow returns correct data for a given Contact ID.
+# Verifies Get_Agent_ContextObject flow returns correct data for a given Contact ID.
 # Usage: ./scripts/test-flow-with-contact.sh [CONTACT_ID]
 # Default: pass Contact ID and org as args, or set SF_CONTACT_ID and SF_TARGET_ORG
 
@@ -18,21 +18,21 @@ TOKEN=$(sf org display --target-org "$ORG" --json 2>/dev/null | jq -r '.result.a
 INSTANCE=$(sf org display --target-org "$ORG" --json 2>/dev/null | jq -r '.result.instanceUrl')
 DOMAIN=$(echo "$INSTANCE" | sed 's|https://||')
 
-echo "Testing Get_Agent_Context flow with ContactId: $CONTACT_ID"
+echo "Testing Get_Agent_ContextObject flow with ContactId: $CONTACT_ID"
 echo ""
 
-RESP=$(curl -s -X POST "${INSTANCE}/services/data/v66.0/actions/custom/flow/Get_Agent_Context" \
+RESP=$(curl -s -X POST "${INSTANCE}/services/data/v66.0/actions/custom/flow/Get_Agent_ContextObject" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"inputs\":[{\"contact_id\":\"$CONTACT_ID\"}]}")
 
 echo "$RESP" | jq -r '.[0] | if .isSuccess then
   "SUCCESS: Flow returned data\n",
-  "  summary: \(.outputValues.summary // "null")\n",
-  "  goal: \(.outputValues.goal // "null")\n",
-  "  issue: \(.outputValues.issue // "null")\n",
-  "  style: \(.outputValues.style // "null")\n",
-  "  tier: \(.outputValues.tier // "null")"
+  "  agent_memory: \(.outputValues.agent_memory // "null")\n",
+  "  memory_summary: \(.outputValues.memory_summary // "null")\n",
+  "  memory_goal: \(.outputValues.memory_goal // "null")\n",
+  "  memory_has_issue: \(.outputValues.memory_has_issue // "null")\n",
+  "  memory_style: \(.outputValues.memory_style // "null")"
 else
   "FAILED: \(.errors)"
 end'

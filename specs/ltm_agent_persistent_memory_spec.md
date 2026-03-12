@@ -76,14 +76,14 @@ To ensure one `Agent_Context__c` record per Contact:
 
 ---
 
-### 5.2 Get_Agent_Context Flow (Read)
+### 5.2 Get_Agent_ContextObject Flow (Read)
 
-Autolaunched Flow that fetches the user's stored context at session start.
+Autolaunched Flow that fetches the user's stored context at session start. **Implementation uses Apex-backed flow** invoking `LoadAgentMemory`.
 
 #### 5.2.1 Create the Flow
 
 1. Go to **Setup** → **Flows** → **New Flow** → **Autolaunched Flow**.
-2. Name: `Get_Agent_Context` (API Name: `Get_Agent_Context`).
+2. Name: `Get_Agent_ContextObject` (API Name: `Get_Agent_ContextObject`).
 
 #### 5.2.2 Input Variable
 
@@ -100,42 +100,30 @@ Autolaunched Flow that fetches the user's stored context at session start.
    - Sort: None (or by CreatedDate DESC if multiple records)
    - Limit: 1
 
-2. **Assignment** (or Formula) to set outputs:
-   - If a record is found, assign:
-     - `summary` ← `{!varAgentContext.Last_Topic_Summary__c}`
-     - `goal` ← `{!varAgentContext.Pending_Goal__c}`
-     - `issue` ← `{!varAgentContext.Unresolved_Issue__c}`
-     - `style` ← `{!varAgentContext.Communication_Style__c}`
-     - `tier` ← `{!varAgentContext.User_Tier__c}`
-   - If no record is found, assign empty/default values:
-     - `summary` ← `""`
-     - `goal` ← `""`
-     - `issue` ← `false`
-     - `style` ← `"Detailed"`
-     - `tier` ← `"Standard"`
+2. **Apex-backed implementation:** The flow invokes `LoadAgentMemory` Apex, which returns `agent_memory`, `memorySummary`, `memoryGoal`, `hasIssue`, `memoryStyle`. The flow assigns these to output variables.
 
 #### 5.2.4 Output Variables
 
 | API Name | Data Type | Available for output | Description |
 |----------|-----------|------------------------|-------------|
-| summary | Text | Yes | Previous conversation summary. |
-| goal | Text | Yes | Pending goal. |
-| issue | Boolean | Yes | Unresolved issue flag. |
-| style | Text | Yes | Preferred communication style. |
-| tier | Text | Yes | User's service tier. |
+| agent_memory | Text | Yes | Formatted merge of all memory fields. |
+| memory_summary | Text | Yes | Previous conversation summary. |
+| memory_goal | Text | Yes | Pending goal. |
+| memory_has_issue | Boolean | Yes | Unresolved issue flag. |
+| memory_style | Text | Yes | Preferred communication style. |
 
 4. **Save** and **Activate** the Flow.
 
 ---
 
-### 5.3 Save_Agent_Context Flow (Write)
+### 5.3 Save_Agent_ContextObject Flow (Write)
 
-Autolaunched Flow that persists the conversation context when the user ends the session.
+Autolaunched Flow that persists the conversation context when the user ends the session. **Implementation uses Apex-backed flow** invoking `SaveAgentContext`.
 
 #### 5.3.1 Create the Flow
 
 1. Go to **Setup** → **Flows** → **New Flow** → **Autolaunched Flow**.
-2. Name: `Save_Agent_Context` (API Name: `Save_Agent_Context`).
+2. Name: `Save_Agent_ContextObject` (API Name: `Save_Agent_ContextObject`).
 
 #### 5.3.2 Input Variables
 
@@ -181,8 +169,8 @@ Autolaunched Flow that persists the conversation context when the user ends the 
 | Unresolved_Issue__c (Checkbox) field | ☐ |
 | Communication_Style__c (Text 50) field | ☐ |
 | User_Tier__c (Text 50) field | ☐ |
-| Get_Agent_Context Flow created and activated | ☐ |
-| Save_Agent_Context Flow created and activated | ☐ |
+| Get_Agent_ContextObject Flow created and activated | ☐ |
+| Save_Agent_ContextObject Flow created and activated | ☐ |
 
 ---
 
@@ -247,13 +235,13 @@ Add a top-level `actions` block (or equivalent) for the Flow invocations. In Age
 
 **fetch_user_context** (invoked from `start_agent`):
 - **Input:** `contact_id` (string) — pass `@variables.ContactId`
-- **Outputs:** `summary`, `goal`, `issue`, `style`, `tier`
-- **Target:** `flow://Get_Agent_Context`
+- **Outputs:** `agent_memory`, `memory_summary`, `memory_goal`, `memory_has_issue`, `memory_style`
+- **Target:** `flow://Get_Agent_ContextObject`
 
 **save_user_context** (invoked from reasoning topics):
-- **Inputs:** `contact_id`, `new_summary`, `new_goal`, `has_issue`
+- **Inputs:** `contact_id`, `new_summary`, `new_goal`, `has_issue`, `new_style`
 - **Output:** `success`
-- **Target:** `flow://Save_Agent_Context`
+- **Target:** `flow://Save_Agent_ContextObject`
 
 ---
 
@@ -275,17 +263,17 @@ start_agent topic_selector:
                 contact_id: string
                     description: "The user's Contact ID"
             outputs:
-                summary: string
+                agent_memory: string
+                    description: "Formatted merge of memory fields"
+                memory_summary: string
                     description: "Previous conversation summary"
-                goal: string
+                memory_goal: string
                     description: "Pending goal"
-                issue: boolean
+                memory_has_issue: boolean
                     description: "Unresolved issue flag"
-                style: string
+                memory_style: string
                     description: "Preferred communication style"
-                tier: string
-                    description: "User's service tier"
-            target: "flow://Get_Agent_Context"
+            target: "flow://Get_Agent_ContextObject"
 
     reasoning:
         instructions: ->
@@ -293,11 +281,11 @@ start_agent topic_selector:
             if @variables.context_loaded == False:
                 run @actions.fetch_user_context
                     with contact_id=@variables.ContactId
-                set @variables.last_summary = @outputs.summary
-                set @variables.pending_goal = @outputs.goal
-                set @variables.unresolved_issue = @outputs.issue
-                set @variables.communication_style = @outputs.style
-                set @variables.user_tier = @outputs.tier
+                set @variables.agent_memory = @outputs.agent_memory
+                set @variables.last_summary = @outputs.memory_summary
+                set @variables.pending_goal = @outputs.memory_goal
+                set @variables.unresolved_issue = @outputs.memory_has_issue
+                set @variables.communication_style = @outputs.memory_style
                 set @variables.context_loaded = True
 
             # 2. ROUTE TO TOPIC (LLM-based)
@@ -379,7 +367,7 @@ topic product_information_retrieval:
             outputs:
                 success: boolean
                     description: "Whether the save was successful"
-            target: "flow://Save_Agent_Context"
+            target: "flow://Save_Agent_ContextObject"
 
     reasoning:
         instructions: ->
@@ -412,7 +400,7 @@ The same pattern applies to: `escalation`, `service_plan_guidance`, `order_statu
 
 ## 8. Assumptions and Notes
 
-1. **Flow API names:** `Get_Agent_Context` and `Save_Agent_Context` (as per the original spec).
+1. **Flow API names:** `Get_Agent_ContextObject` and `Save_Agent_ContextObject` (Apex-backed via LoadAgentMemory and SaveAgentContext).
 2. **ContactId availability:** `ContactId` may be null for unauthenticated users. The implementation should handle this (e.g., skip fetch/save when `ContactId` is empty, or use a fallback).
 3. **Agent Script syntax:** The spec uses `instructions: ->` with procedural logic (`if`, `run`, `set`) as shown in the reference. If Salesforce Agent Script differs (e.g., no procedural block in `start_agent`), the implementation will adapt to the supported syntax.
 4. **Template expressions:** `{@variables.xyz}` and `{!@variables.xyz}` — use the correct syntax per Agent Script documentation.
@@ -432,8 +420,8 @@ The same pattern applies to: `escalation`, `service_plan_guidance`, `order_statu
 **Phase 1 — Prerequisites (create in Salesforce CRM first):**
 - [ ] Create `Agent_Context__c` custom object (Section 5.1)
 - [ ] Add all 6 custom fields to `Agent_Context__c` (Section 5.1.2)
-- [ ] Create and activate `Get_Agent_Context` Flow (Section 5.2)
-- [ ] Create and activate `Save_Agent_Context` Flow (Section 5.3)
+- [ ] Create and activate `Get_Agent_ContextObject` Flow (Section 5.2)
+- [ ] Create and activate `Save_Agent_ContextObject` Flow (Section 5.3)
 
 **Phase 2 — Agent Script:**
 - [ ] Update `system.instructions` with memory-aware tone
